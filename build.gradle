@@ -1,0 +1,139 @@
+plugins {
+    id 'net.fabricmc.fabric-loom-remap' version '1.17.11'
+    id 'maven-publish'
+}
+
+version = (findProperty('slate_version') ?: '0.0.0').toString()
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    maven { url = 'https://maven.fabricmc.net/' }
+    mavenCentral()
+}
+
+dependencies {
+    mappings loom.officialMojangMappings()
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+    include(implementation("io.netty:netty-handler-proxy:4.1.82.Final"))
+    include(implementation("io.netty:netty-codec-socks:4.1.82.Final"))
+
+    def lwjglVersion = '3.4.1'
+    implementation "org.lwjgl:lwjgl-nanovg:${lwjglVersion}"
+    include "org.lwjgl:lwjgl-nanovg:${lwjglVersion}"
+    ['windows', 'linux', 'macos', 'macos-arm64'].each { platform ->
+        implementation "org.lwjgl:lwjgl-nanovg:${lwjglVersion}:natives-${platform}"
+        include "org.lwjgl:lwjgl-nanovg:${lwjglVersion}:natives-${platform}"
+    }
+
+    implementation "com.googlecode.soundlibs:mp3spi:1.9.5.4"
+    implementation "com.googlecode.soundlibs:jlayer:1.0.1.4"
+    implementation "com.googlecode.soundlibs:tritonus-share:0.3.7.4"
+    implementation "net.java.dev.jna:jna:5.17.0"
+    implementation "net.java.dev.jna:jna-platform:5.17.0"
+    include "com.googlecode.soundlibs:mp3spi:1.9.5.4"
+    include "com.googlecode.soundlibs:jlayer:1.0.1.4"
+    include "com.googlecode.soundlibs:tritonus-share:0.3.7.4"
+    include "net.java.dev.jna:jna:5.17.0"
+    include "net.java.dev.jna:jna-platform:5.17.0"
+}
+
+def slateTranslationRepoRawUrl = providers.gradleProperty('slateTranslationRepoRawUrl')
+        .orElse(providers.environmentVariable('SLATE_TRANSLATION_REPO_RAW_URL'))
+def slateTranslationLocales = providers.gradleProperty('slateTranslationLocales')
+        .orElse(providers.environmentVariable('SLATE_TRANSLATION_LOCALES'))
+def generatedSlateLangDir = layout.buildDirectory.dir('generated/slate-lang')
+
+tasks.register('fetchSlateLanguagePacks') {
+    group = 'resources'
+    description = 'Fetches optional Slate language JSON files for inclusion in the mod jar.'
+
+    inputs.property('slateTranslationRepoRawUrl', slateTranslationRepoRawUrl.orNull ?: '')
+    inputs.property('slateTranslationLocales', slateTranslationLocales.orNull ?: '')
+    outputs.dir(generatedSlateLangDir)
+
+    doLast {
+        File outputRoot = generatedSlateLangDir.get().asFile
+        File langDir = new File(outputRoot, 'assets/slate/lang')
+        if (outputRoot.exists()) {
+            outputRoot.deleteDir()
+        }
+        langDir.mkdirs()
+
+        String rawBaseUrl = (slateTranslationRepoRawUrl.orNull ?: '').trim()
+        String rawLocales = (slateTranslationLocales.orNull ?: '').trim()
+        if (rawBaseUrl.isEmpty() || rawLocales.isEmpty()) {
+            logger.lifecycle('Skipping Slate language pack fetch; set -PslateTranslationRepoRawUrl and -PslateTranslationLocales to enable it.')
+            return
+        }
+
+        String normalizedBaseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl : rawBaseUrl + '/'
+        def jsonSlurper = new groovy.json.JsonSlurper()
+        rawLocales.split(',')
+                .collect { it.trim() }
+                .findAll { !it.isEmpty() }
+                .unique()
+                .each { locale ->
+                    URL url = new URL(normalizedBaseUrl + locale + '.json')
+                    File target = new File(langDir, locale + '.json')
+                    logger.lifecycle("Fetching Slate language pack ${locale} from ${url}")
+                    String text
+                    try {
+                        text = url.getText('UTF-8')
+                        if (text.startsWith('\uFEFF')) {
+                            text = text.substring(1)
+                        }
+                        def parsed = jsonSlurper.parseText(text)
+                        if (!(parsed instanceof Map)) {
+                            throw new GradleException("Language pack ${locale} must be a JSON object.")
+                        }
+                    } catch (Exception ex) {
+                        throw new GradleException("Failed to fetch or parse Slate language pack ${locale} from ${url}: ${ex.message}", ex)
+                    }
+
+                    target.setText(groovy.json.JsonOutput.prettyPrint(text), 'UTF-8')
+                }
+    }
+}
+
+processResources {
+    dependsOn tasks.named('fetchSlateLanguagePacks')
+
+    inputs.property 'version', project.version
+    inputs.property 'minecraft_version', project.minecraft_version
+    inputs.property 'loader_version', project.loader_version
+
+    from(generatedSlateLangDir)
+
+    filesMatching('fabric.mod.json') {
+        expand 'version': project.version,
+                'minecraft_version': project.minecraft_version,
+                'loader_version': project.loader_version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.compilerArgs += ['-Xmaxerrs', '10000']
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+jar {
+    from('LICENSE') {
+        rename { "${it}_${project.archives_base_name}" }
+    }
+}
+
+if (file('local.gradle').exists()) {
+    apply from: 'local.gradle'
+}

@@ -1,0 +1,53 @@
+{
+    "required": true,
+    "package": "menear.nclient.slate.mixin",
+    "compatibilityLevel": "JAVA_17",
+    "refmap": "slate-refmap.json",
+    "mixins": [
+        "AccessorInventory"
+    ],
+    "client": [
+        "AccessorAbstractContainerScreen",
+        "AccessorEntity",
+        "AccessorKeyMapping",
+        "AccessorScreen",
+        "PlayerTabOverlayAccessor",
+        "MixinPlayer",
+        "MixinPlayerInfo",
+        "MixinPlayerTeam",
+        "MixinStringDecomposer",
+        "MixinMinecraft",
+        "MixinMinecraftAttackInput",
+        "MixinFreecamInteractionBlocker",
+        "MixinClientLevel",
+        "MixinGameRenderer",
+        "MixinCamera",
+        "MixinMouseHandler",
+        "MixinLocalPlayer",
+        "MixinKeyboardInput",
+        "MixinClientPacketListener",
+        "MixinClientSuggestionProvider",
+        "MixinConnectionChannelInitializer",
+        "MixinMultiPlayerGameMode",
+        "MixinParticlePacketDebug",
+        "MixinParticleEngine",
+        "ChatHudMixin",
+        "MixinGui",
+        "MixinGuiRenderer",
+        "MixinScreen",
+        "MixinSelectionList",
+        "MixinTitleScreen",
+        "MixinWindow",
+        "MixinJoinMultiplayerScreen",
+        "MixinManageServerScreen",
+        "MixinDirectJoinServerScreen",
+        "MixinConfirmScreen",
+        "MixinOptions",
+        "MixinContainerEventHandler",
+        "MenuFPSUncap",
+        "MixinKeepFocus"
+    ],
+    "injectors": {
+        "defaultRequire": 1
+    }
+}
