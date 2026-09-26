@@ -1,4 +1,4 @@
-# typical-farming-macro
+# slatefm
 
-## wow i wonder what this is
+## dont ask me about the name
 ## fyi the command to open gui is /slate
